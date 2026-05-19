@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: wordpress
+  labels:
+    app: wordpress
+
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: wordpress
+
+  template:
+    metadata:
+      labels:
+        app: wordpress
+
+    spec:
+      serviceAccountName: cloudsql-proxy
+
+      containers:
+
+      - name: wordpress
+        image: wordpress:latest
+
+        env:
+        - name: WORDPRESS_DB_HOST
+          value: "127.0.0.1:3306"
+
+        - name: WORDPRESS_DB_NAME
+          value: "wordpress"
+
+        - name: WORDPRESS_DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: cloudsql-db-credentials
+              key: username
+
+        - name: WORDPRESS_DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: cloudsql-db-credentials
+              key: password
+
+        ports:
+        - containerPort: 80
+          name: wordpress
+
+        volumeMounts:
+        - name: wordpress-persistent-storage
+          mountPath: /var/www/html
+
+      - name: cloud-sql-proxy
+        image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.8.0
+
+        args:
+        - "--structured-logs"
+        - "--port=3306"
+        - "destrinchando-o-gke-496623:us-central1:mysql-wordpress-instance"
+
+        securityContext:
+          runAsNonRoot: true
+
+      volumes:
+      - name: wordpress-persistent-storage
+        persistentVolumeClaim:
+          claimName: wordpress-volumeclaim
